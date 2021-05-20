@@ -20,34 +20,39 @@ func NewSkipString(every uint16, s string) SkipString {
 		panic("Error: Invalid value for 'every': 0")
 	}
 
-	runes := []rune(s)
 	ss := SkipString{
 		every: every,
-		runes: runes,
-		// need len of []rune to avoid getting byte count of string
-		// in case of multibyte codepoints
-		countAtPos: make([]uint16, len(runes)),
+		runes: []rune(s),
 	}
+	// slices are pass by reference so I'm not worried about copying
+	// arrays here. Separate function instead of inline for cleaner
+	// test boundaries
+	ss.countAtPos = constructAlphaNumMap(every, ss.runes)
 
-	// build a map of which indices should by uppercased so we don't
-	// have to iterate from 0 to pos on every transformation
+	return ss
+}
+
+// build a map of which indices should by uppercased so we don't
+// have to iterate from 0 to pos on every transformation
+func constructAlphaNumMap(every uint16, runes []rune) []uint16 {
+	countAtPos := make([]uint16, len(runes))
 	alNumCount := uint16(0)
-	for idx, r := range ss.runes {
+	for idx, r := range runes {
 		l := unicode.ToLower(r)
 		switch {
 		case (l >= '0' && l <= '9') || (l >= 'a' && l <= 'z'):
 			alNumCount++
-			ss.countAtPos[idx] = alNumCount
+			countAtPos[idx] = alNumCount
 			if alNumCount == every {
 				alNumCount = 0
 			}
 		default:
 			// differentiate between alphanumerics and other codepoints
 			// in case we only want to lower case the alphanumerics in future
-			ss.countAtPos[idx] = 0
+			countAtPos[idx] = 0
 		}
 	}
-	return ss
+	return countAtPos
 }
 
 func (s *SkipString) TransformRune(pos int) {
